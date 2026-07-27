@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   X,
   Menu,
+  AlertTriangle,
 } from "lucide-react";
 
 type Post = {
@@ -37,10 +38,21 @@ export default function ForumPage() {
   // Mobile Sidebar Drawer State
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Modal State
+  // Instructor Modal State
   const [showModal, setShowModal] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [passError, setPassError] = useState("");
+
+  // Delete Confirmation Modal State
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    id: string | null;
+    isReply: boolean;
+  }>({
+    isOpen: false,
+    id: null,
+    isReply: false,
+  });
 
   // Form State
   const [title, setTitle] = useState("");
@@ -179,23 +191,20 @@ export default function ForumPage() {
     setLoading(false);
   };
 
-  const handleDelete = async (id: string, isReply = false) => {
+  const promptDelete = (id: string, isReply = false) => {
     if (!isInstructor) return;
+    setDeleteModal({ isOpen: true, id, isReply });
+  };
 
-    const confirmMessage = isReply
-      ? lang === "en"
-        ? "Are you sure you want to delete this reply?"
-        : "この返信を削除してもよろしいですか？"
-      : lang === "en"
-        ? "Are you sure you want to delete this discussion topic and all of its replies?"
-        : "このトピックとすべての返信を削除してもよろしいですか？";
+  const confirmDelete = async () => {
+    if (!deleteModal.id) return;
 
-    const confirmed = window.confirm(confirmMessage);
-    if (!confirmed) return;
+    const targetId = deleteModal.id;
+    setDeleteModal({ isOpen: false, id: null, isReply: false });
 
-    const { error } = await supabase.from("posts").delete().eq("id", id);
+    const { error } = await supabase.from("posts").delete().eq("id", targetId);
     if (!error) {
-      if (selectedPostId === id) setSelectedPostId(null);
+      if (selectedPostId === targetId) setSelectedPostId(null);
       fetchPosts();
     } else {
       alert(
@@ -448,7 +457,7 @@ export default function ForumPage() {
 
                 {isInstructor && (
                   <button
-                    onClick={() => handleDelete(activePost.id, false)}
+                    onClick={() => promptDelete(activePost.id, false)}
                     className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
                     title={lang === "en" ? "Delete Topic" : "トピック削除"}
                   >
@@ -485,7 +494,7 @@ export default function ForumPage() {
                     isInstructor={isInstructor}
                     lang={lang}
                     onRefresh={fetchPosts}
-                    onDelete={(id) => handleDelete(id, true)}
+                    onDelete={(id) => promptDelete(id, true)}
                   />
                 ))}
               </div>
@@ -502,7 +511,7 @@ export default function ForumPage() {
 
       {/* ==================== INSTRUCTOR MODAL ==================== */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
@@ -544,6 +553,50 @@ export default function ForumPage() {
                 {lang === "en" ? "Claim Instructor Status" : "講師権限を取得"}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DELETE CONFIRMATION MODAL ==================== */}
+      {deleteModal.isOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-sm">
+                  {lang === "en" ? "Confirm Deletion" : "削除の確認"}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                  {deleteModal.isReply
+                    ? lang === "en"
+                      ? "Are you sure you want to delete this reply?"
+                      : "この返信を削除してもよろしいですか？"
+                    : lang === "en"
+                      ? "Are you sure you want to delete this discussion topic and all of its replies?"
+                      : "このトピックとすべての返信を削除してもよろしいですか？"}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() =>
+                  setDeleteModal({ isOpen: false, id: null, isReply: false })
+                }
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                {lang === "en" ? "Cancel" : "キャンセル"}
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer shadow-sm"
+              >
+                {lang === "en" ? "Delete" : "削除する"}
+              </button>
+            </div>
           </div>
         </div>
       )}
