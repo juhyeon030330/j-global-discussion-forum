@@ -32,6 +32,7 @@ export default function ForumPage() {
   const [isInstructor, setIsInstructor] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [lang, setLang] = useState<"en" | "jp">("en");
 
   // Mobile Sidebar Drawer State
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -54,16 +55,23 @@ export default function ForumPage() {
       setIsInstructor(savedInstructor === "true");
     };
 
+    const checkLang = () => {
+      const savedLang = localStorage.getItem("forum_lang") as "en" | "jp";
+      if (savedLang) setLang(savedLang);
+    };
+
     const savedName = localStorage.getItem("forum_nickname");
     if (savedName) setNickname(savedName);
 
     checkInstructorStatus();
+    checkLang();
     fetchPosts();
 
     const handleOpenModal = () => setShowModal(true);
 
     window.addEventListener("open-instructor-modal", handleOpenModal);
     window.addEventListener("instructor-status-changed", checkInstructorStatus);
+    window.addEventListener("lang-changed", checkLang);
 
     return () => {
       window.removeEventListener("open-instructor-modal", handleOpenModal);
@@ -71,6 +79,7 @@ export default function ForumPage() {
         "instructor-status-changed",
         checkInstructorStatus,
       );
+      window.removeEventListener("lang-changed", checkLang);
     };
   }, []);
 
@@ -89,7 +98,11 @@ export default function ForumPage() {
       setPasscode("");
       setPassError("");
     } else {
-      setPassError("Incorrect password. Please try again.");
+      setPassError(
+        lang === "en"
+          ? "Incorrect password. Please try again."
+          : "パスワードが正しくありません。再入力してください。",
+      );
     }
   };
 
@@ -131,7 +144,14 @@ export default function ForumPage() {
 
     setLoading(true);
     const author =
-      nickname.trim() || (isInstructor ? "Instructor" : "Anonymous");
+      nickname.trim() ||
+      (isInstructor
+        ? lang === "en"
+          ? "Instructor"
+          : "講師"
+        : lang === "en"
+          ? "Anonymous"
+          : "匿名");
 
     const { data, error } = await supabase
       .from("posts")
@@ -151,7 +171,10 @@ export default function ForumPage() {
       await fetchPosts();
       if (data && data[0]) setSelectedPostId(data[0].id);
     } else {
-      alert("Failed to create post: " + error.message);
+      alert(
+        (lang === "en" ? "Failed to create post: " : "投稿に失敗しました: ") +
+          error.message,
+      );
     }
     setLoading(false);
   };
@@ -160,8 +183,12 @@ export default function ForumPage() {
     if (!isInstructor) return;
 
     const confirmMessage = isReply
-      ? "Are you sure you want to delete this reply?"
-      : "Are you sure you want to delete this discussion topic and all of its replies?";
+      ? lang === "en"
+        ? "Are you sure you want to delete this reply?"
+        : "この返信を削除してもよろしいですか？"
+      : lang === "en"
+        ? "Are you sure you want to delete this discussion topic and all of its replies?"
+        : "このトピックとすべての返信を削除してもよろしいですか？";
 
     const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
@@ -171,7 +198,10 @@ export default function ForumPage() {
       if (selectedPostId === id) setSelectedPostId(null);
       fetchPosts();
     } else {
-      alert("Error deleting post: " + error.message);
+      alert(
+        (lang === "en" ? "Error deleting post: " : "削除エラー: ") +
+          error.message,
+      );
     }
   };
 
@@ -193,7 +223,7 @@ export default function ForumPage() {
         />
       )}
 
-      {/* ==================== LEFT SIDEBAR (DRAWER ON MOBILE, FIXED ON DESKTOP) ==================== */}
+      {/* ==================== LEFT SIDEBAR ==================== */}
       <aside
         className={`fixed sm:relative z-40 sm:z-auto inset-y-0 left-0 w-72 sm:w-84 bg-white border-r border-slate-200 flex flex-col h-full shrink-0 transform transition-transform duration-200 ease-in-out ${
           mobileOpen ? "translate-x-0" : "-translate-x-full sm:translate-x-0"
@@ -206,13 +236,14 @@ export default function ForumPage() {
                 setIsCreating(true);
                 setMobileOpen(false);
               }}
-              className="w-full bg-[#1f497c] hover:bg-[#183961] text-white font-semibold py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs shadow-sm transition-all"
+              className="w-full bg-[#1f497c] hover:bg-[#183961] text-white font-semibold py-2 px-3 rounded-xl flex items-center justify-center gap-2 text-xs shadow-sm transition-all cursor-pointer"
             >
-              <Plus size={15} /> Start New Topic
+              <Plus size={15} />{" "}
+              {lang === "en" ? "Start New Topic" : "新規トピック作成"}
             </button>
             <button
               onClick={() => setMobileOpen(false)}
-              className="sm:hidden text-slate-400 hover:text-slate-600 p-1"
+              className="sm:hidden text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -226,7 +257,7 @@ export default function ForumPage() {
             />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={lang === "en" ? "Search..." : "検索..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-8 pr-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#1f497c]/20"
@@ -241,13 +272,13 @@ export default function ForumPage() {
                 type="text"
                 value={nickname}
                 onChange={(e) => handleNicknameChange(e.target.value)}
-                placeholder="Display Name..."
+                placeholder={lang === "en" ? "Display Name..." : "表示名..."}
                 className="w-full border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#1f497c]"
               />
             </div>
             {isInstructor && (
               <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
-                <ShieldCheck size={11} /> Inst.
+                <ShieldCheck size={11} /> {lang === "en" ? "Inst." : "講師"}
               </span>
             )}
           </div>
@@ -263,7 +294,7 @@ export default function ForumPage() {
                 onClick={() => {
                   setSelectedPostId(post.id);
                   setIsCreating(false);
-                  setMobileOpen(false); // Close sidebar on mobile item tap
+                  setMobileOpen(false);
                 }}
                 className={`p-3.5 cursor-pointer transition-all border-l-4 ${
                   isSelected
@@ -283,7 +314,8 @@ export default function ForumPage() {
                         className="text-amber-600 inline shrink-0"
                       />
                     )}
-                    {post.title || "Untitled Topic"}
+                    {post.title ||
+                      (lang === "en" ? "Untitled Topic" : "無題のトピック")}
                   </h4>
                   <span className="text-[10px] text-slate-400 shrink-0">
                     {new Date(post.created_at).toLocaleDateString()}
@@ -308,16 +340,18 @@ export default function ForumPage() {
 
       {/* ==================== RIGHT PANEL ==================== */}
       <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
-        {/* Mobile Top Navigation Bar for opening topics sidebar */}
+        {/* Mobile Top Navigation Bar */}
         <div className="sm:hidden flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200">
           <button
             onClick={() => setMobileOpen(true)}
-            className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200/80"
+            className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg border border-slate-200/80 cursor-pointer"
           >
-            <Menu size={16} /> Topics & Menu
+            <Menu size={16} />{" "}
+            {lang === "en" ? "Topics & Menu" : "トピック一覧"}
           </button>
           <span className="text-xs text-slate-500 truncate max-w-[150px]">
-            {activePost?.title || "Discussions"}
+            {activePost?.title ||
+              (lang === "en" ? "Discussions" : "ディスカッション")}
           </span>
         </div>
 
@@ -326,21 +360,27 @@ export default function ForumPage() {
             <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm">
               <h2 className="text-xl font-bold mb-5 text-slate-800 flex items-center gap-2">
                 <MessageSquare size={22} className="text-[#1f497c]" />
-                Start a New Discussion
+                {lang === "en"
+                  ? "Start a New Discussion"
+                  : "新しいトピックを開始"}
               </h2>
               <form onSubmit={handleCreatePost} className="flex flex-col gap-5">
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Subject title..."
+                  placeholder={
+                    lang === "en" ? "Subject title..." : "件名・タイトル..."
+                  }
                   required
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-base focus:outline-none focus:border-[#1f497c]"
                 />
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  placeholder="Write details here..."
+                  placeholder={
+                    lang === "en" ? "Write details here..." : "本文を入力..."
+                  }
                   rows={8}
                   required
                   className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-base focus:outline-none focus:border-[#1f497c]"
@@ -349,16 +389,22 @@ export default function ForumPage() {
                   <button
                     type="button"
                     onClick={() => setIsCreating(false)}
-                    className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800"
+                    className="px-5 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-800 cursor-pointer"
                   >
-                    Cancel
+                    {lang === "en" ? "Cancel" : "キャンセル"}
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="bg-[#1f497c] text-white font-semibold py-2.5 px-6 rounded-xl text-sm shadow-sm"
+                    className="bg-[#1f497c] text-white font-semibold py-2.5 px-6 rounded-xl text-sm shadow-sm cursor-pointer"
                   >
-                    {loading ? "Posting..." : "Post Topic"}
+                    {loading
+                      ? lang === "en"
+                        ? "Posting..."
+                        : "投稿中..."
+                      : lang === "en"
+                        ? "Post Topic"
+                        : "投稿する"}
                   </button>
                 </div>
               </form>
@@ -378,28 +424,33 @@ export default function ForumPage() {
                 <div>
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h1 className="text-xl sm:text-2xl font-bold text-slate-900 leading-snug">
-                      {activePost.title || "Untitled Discussion"}
+                      {activePost.title ||
+                        (lang === "en"
+                          ? "Untitled Discussion"
+                          : "無題のディスカッション")}
                     </h1>
                     {activePost.is_instructor && (
                       <span className="bg-amber-200 text-amber-900 text-xs font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                        <ShieldCheck size={14} /> INSTRUCTOR
+                        <ShieldCheck size={14} />{" "}
+                        {lang === "en" ? "INSTRUCTOR" : "講師"}
                       </span>
                     )}
                   </div>
                   <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
-                    Posted by{" "}
+                    {lang === "en" ? "Posted by " : "投稿者: "}
                     <span className="font-semibold text-slate-800">
                       {activePost.author_name}
                     </span>{" "}
-                    on {new Date(activePost.created_at).toLocaleString()}
+                    {lang === "en" ? "on " : " "}
+                    {new Date(activePost.created_at).toLocaleString()}
                   </p>
                 </div>
 
                 {isInstructor && (
                   <button
                     onClick={() => handleDelete(activePost.id, false)}
-                    className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100"
-                    title="Delete Topic"
+                    className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
+                    title={lang === "en" ? "Delete Topic" : "トピック削除"}
                   >
                     <Trash2 size={18} />
                   </button>
@@ -414,13 +465,14 @@ export default function ForumPage() {
             {/* Replies Section */}
             <section className="space-y-5">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                Replies & Comments
+                {lang === "en" ? "Replies & Comments" : "返信・コメント"}
               </h3>
 
               <ReplyBox
                 postId={activePost.id}
                 nickname={nickname}
                 isInstructor={isInstructor}
+                lang={lang}
                 onRefresh={fetchPosts}
               />
 
@@ -431,6 +483,7 @@ export default function ForumPage() {
                     post={reply}
                     nickname={nickname}
                     isInstructor={isInstructor}
+                    lang={lang}
                     onRefresh={fetchPosts}
                     onDelete={(id) => handleDelete(id, true)}
                   />
@@ -440,7 +493,9 @@ export default function ForumPage() {
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-slate-400 text-sm">
-            Select a discussion topic from the sidebar to view thread.
+            {lang === "en"
+              ? "Select a discussion topic from the sidebar to view thread."
+              : "サイドバーからトピックを選択してください。"}
           </div>
         )}
       </main>
@@ -452,11 +507,11 @@ export default function ForumPage() {
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
                 <ShieldCheck size={18} className="text-amber-500" />
-                Instructor Verification
+                {lang === "en" ? "Instructor Verification" : "講師認証"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -465,13 +520,15 @@ export default function ForumPage() {
             <form onSubmit={handleInstructorLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">
-                  Instructor Passcode
+                  {lang === "en" ? "Instructor Passcode" : "講師パスコード"}
                 </label>
                 <input
                   type="password"
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Enter passcode..."
+                  placeholder={
+                    lang === "en" ? "Enter passcode..." : "パスコードを入力..."
+                  }
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
                   required
                 />
@@ -482,9 +539,9 @@ export default function ForumPage() {
 
               <button
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-xl text-xs transition-colors shadow-sm"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-xl text-xs transition-colors shadow-sm cursor-pointer"
               >
-                Claim Instructor Status
+                {lang === "en" ? "Claim Instructor Status" : "講師権限を取得"}
               </button>
             </form>
           </div>
@@ -498,11 +555,13 @@ function ReplyBox({
   postId,
   nickname,
   isInstructor,
+  lang,
   onRefresh,
 }: {
   postId: string;
   nickname: string;
   isInstructor: boolean;
+  lang: "en" | "jp";
   onRefresh: () => void;
 }) {
   const [replyContent, setReplyContent] = useState("");
@@ -515,7 +574,14 @@ function ReplyBox({
 
     setLoading(true);
     const author =
-      nickname.trim() || (isInstructor ? "Instructor" : "Anonymous");
+      nickname.trim() ||
+      (isInstructor
+        ? lang === "en"
+          ? "Instructor"
+          : "講師"
+        : lang === "en"
+          ? "Anonymous"
+          : "匿名");
 
     const { error } = await supabase.from("posts").insert({
       content: replyContent,
@@ -539,7 +605,13 @@ function ReplyBox({
       <textarea
         value={replyContent}
         onChange={(e) => setReplyContent(e.target.value)}
-        placeholder={`Replying as ${nickname || (isInstructor ? "Instructor" : "Anonymous")}...`}
+        placeholder={
+          lang === "en"
+            ? `Replying as ${
+                nickname || (isInstructor ? "Instructor" : "Anonymous")
+              }...`
+            : `${nickname || (isInstructor ? "講師" : "匿名")} として返信...`
+        }
         rows={3}
         required
         className="w-full border border-slate-200 rounded-lg p-3 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1f497c]"
@@ -548,9 +620,15 @@ function ReplyBox({
         <button
           type="submit"
           disabled={loading}
-          className="bg-[#1f497c] text-white text-xs font-semibold py-2 px-5 rounded-lg hover:bg-[#183961] transition-colors disabled:opacity-50"
+          className="bg-[#1f497c] text-white text-xs font-semibold py-2 px-5 rounded-lg hover:bg-[#183961] transition-colors disabled:opacity-50 cursor-pointer"
         >
-          {loading ? "Sending..." : "Post Reply"}
+          {loading
+            ? lang === "en"
+              ? "Sending..."
+              : "送信中..."
+            : lang === "en"
+              ? "Post Reply"
+              : "返信する"}
         </button>
       </div>
     </form>
@@ -561,12 +639,14 @@ function ThreadItem({
   post,
   nickname,
   isInstructor,
+  lang,
   onRefresh,
   onDelete,
 }: {
   post: Post;
   nickname: string;
   isInstructor: boolean;
+  lang: "en" | "jp";
   onRefresh: () => void;
   onDelete: (id: string) => void;
 }) {
@@ -588,7 +668,8 @@ function ThreadItem({
             </span>
             {post.is_instructor && (
               <span className="bg-amber-200 text-amber-900 text-[10px] font-extrabold px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <ShieldCheck size={11} /> INSTRUCTOR
+                <ShieldCheck size={11} />{" "}
+                {lang === "en" ? "INSTRUCTOR" : "講師"}
               </span>
             )}
           </div>
@@ -600,8 +681,8 @@ function ThreadItem({
             {isInstructor && (
               <button
                 onClick={() => onDelete(post.id)}
-                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded"
-                title="Delete Reply"
+                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded cursor-pointer"
+                title={lang === "en" ? "Delete Reply" : "返信削除"}
               >
                 <Trash2 size={15} />
               </button>
@@ -615,10 +696,16 @@ function ThreadItem({
 
         <button
           onClick={() => setIsReplying(!isReplying)}
-          className="mt-3 text-xs font-semibold text-[#1f497c] hover:underline flex items-center gap-1"
+          className="mt-3 text-xs font-semibold text-[#1f497c] hover:underline flex items-center gap-1 cursor-pointer"
         >
           <CornerDownRight size={13} />
-          {isReplying ? "Cancel" : "Reply"}
+          {isReplying
+            ? lang === "en"
+              ? "Cancel"
+              : "キャンセル"
+            : lang === "en"
+              ? "Reply"
+              : "返信"}
         </button>
 
         {isReplying && (
@@ -627,6 +714,7 @@ function ThreadItem({
               postId={post.id}
               nickname={nickname}
               isInstructor={isInstructor}
+              lang={lang}
               onRefresh={() => {
                 setIsReplying(false);
                 onRefresh();
@@ -642,6 +730,7 @@ function ThreadItem({
           post={reply}
           nickname={nickname}
           isInstructor={isInstructor}
+          lang={lang}
           onRefresh={onRefresh}
           onDelete={onDelete}
         />
