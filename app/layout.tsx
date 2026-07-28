@@ -79,7 +79,7 @@ export default function RootLayout({
               />
             </Link>
 
-            {/* Breadcrumbs with fixed line height and alignment */}
+            {/* Breadcrumbs */}
             <div className="hidden sm:flex items-center text-xs font-bold text-slate-700 leading-none h-5">
               <span className="inline-block tracking-tight">
                 {lang === "en" ? "Dashboard" : "ダッシュボード"}
@@ -93,7 +93,7 @@ export default function RootLayout({
 
           {/* RIGHT SIDE CONTENT */}
           <div className="flex items-center gap-3 md:gap-4 shrink-0 relative">
-            {/* Real Toggle Switch UI */}
+            {/* Language Switcher */}
             <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200/80 text-xs font-semibold select-none">
               <button
                 type="button"

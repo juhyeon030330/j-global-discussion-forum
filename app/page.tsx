@@ -214,11 +214,26 @@ export default function ForumPage() {
     }
   };
 
-  const filteredPosts = posts.filter(
-    (p) =>
-      p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.content.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  // Helper function to check if a post or ANY of its nested replies contain the search term
+  const postMatchesSearch = (post: Post, term: string): boolean => {
+    const query = term.toLowerCase().trim();
+    if (!query) return true;
+
+    // Check main title and main content
+    const matchesTitle = post.title?.toLowerCase().includes(query) ?? false;
+    const matchesContent = post.content.toLowerCase().includes(query);
+
+    if (matchesTitle || matchesContent) return true;
+
+    // Recursively check all child replies (and their replies)
+    if (post.replies && post.replies.length > 0) {
+      return post.replies.some((reply) => postMatchesSearch(reply, term));
+    }
+
+    return false;
+  };
+
+  const filteredPosts = posts.filter((p) => postMatchesSearch(p, searchTerm));
 
   const activePost = posts.find((p) => p.id === selectedPostId);
 
