@@ -2,18 +2,20 @@
 
 import { useState } from "react";
 import { createClient } from "@/utils/supabase/client";
-import { CornerDownRight, Trash2, ShieldCheck } from "lucide-react";
+import { CornerDownRight, Trash2, Edit2, ShieldCheck } from "lucide-react";
 import { Post } from "./types";
 
 export function ReplyBox({
   postId,
   nickname,
+  sessionId,
   isInstructor,
   lang,
   onRefresh,
 }: {
   postId: string;
   nickname: string;
+  sessionId: string;
   isInstructor: boolean;
   lang: "en" | "jp";
   onRefresh: () => void;
@@ -40,6 +42,7 @@ export function ReplyBox({
     const { error } = await supabase.from("posts").insert({
       content: replyContent,
       author_name: author,
+      session_id: sessionId,
       is_instructor: isInstructor,
       parent_id: postId,
     });
@@ -92,6 +95,7 @@ export function ReplyBox({
 export function ThreadItem({
   post,
   nickname,
+  sessionId,
   isInstructor,
   lang,
   onRefresh,
@@ -99,12 +103,35 @@ export function ThreadItem({
 }: {
   post: Post;
   nickname: string;
+  sessionId: string;
   isInstructor: boolean;
   lang: "en" | "jp";
   onRefresh: () => void;
   onDelete: (id: string) => void;
 }) {
   const [isReplying, setIsReplying] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(post.content);
+  const [saving, setSaving] = useState(false);
+
+  const supabase = createClient();
+  const canModify =
+    isInstructor || (Boolean(sessionId) && post.session_id === sessionId);
+
+  const handleUpdateReply = async () => {
+    if (!editContent.trim()) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("posts")
+      .update({ content: editContent })
+      .eq("id", post.id);
+
+    if (!error) {
+      setIsEditing(false);
+      onRefresh();
+    }
+    setSaving(false);
+  };
 
   return (
     <div className="space-y-3 pl-3 sm:pl-6 border-l-2 border-slate-200">
@@ -127,26 +154,67 @@ export function ThreadItem({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400">
               {new Date(post.created_at).toLocaleString()}
             </span>
 
-            {isInstructor && (
-              <button
-                onClick={() => onDelete(post.id)}
-                className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded cursor-pointer"
-                title={lang === "en" ? "Delete Reply" : "返信削除"}
-              >
-                <Trash2 size={15} />
-              </button>
+            {canModify && !isEditing && (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="text-slate-400 hover:text-blue-600 transition-colors p-1 rounded cursor-pointer"
+                  title={lang === "en" ? "Edit Reply" : "返信編集"}
+                >
+                  <Edit2 size={15} />
+                </button>
+                <button
+                  onClick={() => onDelete(post.id)}
+                  className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded cursor-pointer"
+                  title={lang === "en" ? "Delete Reply" : "返信削除"}
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        <p className="text-slate-800 text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
-          {post.content}
-        </p>
+        {isEditing ? (
+          <div className="space-y-2 mt-2">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg p-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1f497c]"
+              rows={3}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-3 py-1 text-xs text-slate-600 hover:text-slate-800"
+              >
+                {lang === "en" ? "Cancel" : "キャンセル"}
+              </button>
+              <button
+                onClick={handleUpdateReply}
+                disabled={saving}
+                className="px-3 py-1 bg-[#1f497c] text-white rounded text-xs font-semibold"
+              >
+                {saving
+                  ? lang === "en"
+                    ? "Saving..."
+                    : "保存中..."
+                  : lang === "en"
+                    ? "Save"
+                    : "保存"}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-slate-800 text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
+            {post.content}
+          </p>
+        )}
 
         <button
           onClick={() => setIsReplying(!isReplying)}
@@ -167,6 +235,7 @@ export function ThreadItem({
             <ReplyBox
               postId={post.id}
               nickname={nickname}
+              sessionId={sessionId}
               isInstructor={isInstructor}
               lang={lang}
               onRefresh={() => {
@@ -183,6 +252,7 @@ export function ThreadItem({
           key={reply.id}
           post={reply}
           nickname={nickname}
+          sessionId={sessionId}
           isInstructor={isInstructor}
           lang={lang}
           onRefresh={onRefresh}

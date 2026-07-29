@@ -12,6 +12,8 @@ function ForumContent() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>("");
+  const [nicknameError, setNicknameError] = useState<string>("");
+  const [sessionId, setSessionId] = useState<string>("");
   const [isInstructor, setIsInstructor] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,6 +39,20 @@ function ForumContent() {
   const supabase = createClient();
 
   useEffect(() => {
+    // Generate or fetch unique invisible session token
+    let currentSession = localStorage.getItem("forum_session_id");
+    if (!currentSession) {
+      currentSession =
+        "sess_" +
+        Math.random().toString(36).substring(2, 15) +
+        Date.now().toString(36);
+      localStorage.setItem("forum_session_id", currentSession);
+    }
+    setSessionId(currentSession);
+
+    const savedName = localStorage.getItem("forum_nickname");
+    if (savedName) setNickname(savedName);
+
     const checkInstructorStatus = () => {
       setIsInstructor(localStorage.getItem("forum_is_instructor") === "true");
     };
@@ -45,9 +61,6 @@ function ForumContent() {
       const savedLang = localStorage.getItem("forum_lang") as "en" | "jp";
       if (savedLang) setLang(savedLang);
     };
-
-    const savedName = localStorage.getItem("forum_nickname");
-    if (savedName) setNickname(savedName);
 
     checkInstructorStatus();
     checkLang();
@@ -69,11 +82,44 @@ function ForumContent() {
     };
   }, []);
 
+  const handleNicknameChange = async (val: string) => {
+    setNickname(val);
+    setNicknameError("");
+
+    const trimmed = val.trim();
+    if (!trimmed) {
+      localStorage.removeItem("forum_nickname");
+      return;
+    }
+
+    // Check if nickname is taken by another session
+    const { data } = await supabase
+      .from("reserved_nicknames")
+      .select("session_id")
+      .eq("nickname", trimmed)
+      .maybeSingle();
+
+    if (data && data.session_id !== sessionId) {
+      setNicknameError(
+        lang === "en"
+          ? "Nickname is currently in use by another user"
+          : "この表示名は別のユーザーによって使用されています",
+      );
+    } else {
+      // Claim nickname for this session
+      await supabase.from("reserved_nicknames").upsert({
+        nickname: trimmed,
+        session_id: sessionId,
+        updated_at: new Date().toISOString(),
+      });
+      localStorage.setItem("forum_nickname", trimmed);
+    }
+  };
+
   const handleSelectPost = (id: string) => {
     setSelectedPostId(id);
     setIsCreating(false);
     setMobileOpen(false);
-    // Sync to URL query param
     router.push(`?post=${id}`, { scroll: false });
   };
 
@@ -87,7 +133,6 @@ function ForumContent() {
       const tree = buildThreadTree(data as Post[]);
       setPosts(tree);
 
-      // Check URL search parameter for direct deep link
       const urlPostId = searchParams.get("post");
       if (urlPostId && tree.some((p) => p.id === urlPostId)) {
         setSelectedPostId(urlPostId);
@@ -114,11 +159,6 @@ function ForumContent() {
     return roots.reverse();
   };
 
-  const handleNicknameChange = (val: string) => {
-    setNickname(val);
-    localStorage.setItem("forum_nickname", val);
-  };
-
   const handleInstructorLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (passcode === "jglobal1414") {
@@ -139,7 +179,7 @@ function ForumContent() {
 
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim() || nicknameError) return;
 
     setLoading(true);
     const author =
@@ -158,6 +198,7 @@ function ForumContent() {
         title: title.trim() || null,
         content,
         author_name: author,
+        session_id: sessionId,
         is_instructor: isInstructor,
         parent_id: null,
       })
@@ -178,9 +219,30 @@ function ForumContent() {
     setLoading(false);
   };
 
-  const promptDelete = (id: string, isReply = false) => {
-    if (!isInstructor) return;
-    setDeleteModal({ isOpen: true, id, isReply });
+  const promptDelete = (id: string) => {
+    const postToDelete = findPostById(posts, id);
+    if (
+      !isInstructor &&
+      (!sessionId || postToDelete?.session_id !== sessionId)
+    ) {
+      return;
+    }
+    setDeleteModal({
+      isOpen: true,
+      id,
+      isReply: Boolean(postToDelete?.parent_id),
+    });
+  };
+
+  const findPostById = (list: Post[], targetId: string): Post | null => {
+    for (const p of list) {
+      if (p.id === targetId) return p;
+      if (p.replies) {
+        const found = findPostById(p.replies, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
   };
 
   const confirmDelete = async () => {
@@ -224,6 +286,7 @@ function ForumContent() {
         selectedPostId={selectedPostId}
         searchTerm={searchTerm}
         nickname={nickname}
+        nicknameError={nicknameError}
         isInstructor={isInstructor}
         isCreating={isCreating}
         mobileOpen={mobileOpen}
@@ -243,6 +306,7 @@ function ForumContent() {
         isCreating={isCreating}
         isInstructor={isInstructor}
         nickname={nickname}
+        sessionId={sessionId}
         lang={lang}
         title={title}
         content={content}

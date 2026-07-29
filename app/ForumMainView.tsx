@@ -5,6 +5,7 @@ import {
   MessageSquare,
   ShieldCheck,
   Trash2,
+  Edit2,
   Menu,
   CheckCircle2,
   Share2,
@@ -12,12 +13,14 @@ import {
 } from "lucide-react";
 import { Post } from "./types";
 import { ReplyBox, ThreadItem } from "./ThreadComponents";
+import { createClient } from "@/utils/supabase/client";
 
 interface ForumMainViewProps {
   activePost: Post | undefined;
   isCreating: boolean;
   isInstructor: boolean;
   nickname: string;
+  sessionId: string;
   lang: "en" | "jp";
   title: string;
   content: string;
@@ -31,7 +34,6 @@ interface ForumMainViewProps {
   onRefresh: () => void;
 }
 
-// Check if any reply in this thread comes from an instructor
 function hasInstructorReply(post: Post): boolean {
   if (post.is_instructor) return true;
   if (!post.replies || post.replies.length === 0) return false;
@@ -43,6 +45,7 @@ export function ForumMainView({
   isCreating,
   isInstructor,
   nickname,
+  sessionId,
   lang,
   title,
   content,
@@ -56,10 +59,44 @@ export function ForumMainView({
   onRefresh,
 }: ForumMainViewProps) {
   const [copied, setCopied] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
+  const supabase = createClient();
   const isAnsweredByInstructor = activePost
     ? hasInstructorReply(activePost)
     : false;
+  const canModify =
+    activePost &&
+    (isInstructor ||
+      (Boolean(sessionId) && activePost.session_id === sessionId));
+
+  const startEditing = () => {
+    if (!activePost) return;
+    setEditTitle(activePost.title || "");
+    setEditContent(activePost.content || "");
+    setIsEditing(true);
+  };
+
+  const handleUpdateTopic = async () => {
+    if (!activePost || !editContent.trim()) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("posts")
+      .update({
+        title: editTitle.trim() || null,
+        content: editContent,
+      })
+      .eq("id", activePost.id);
+
+    if (!error) {
+      setIsEditing(false);
+      onRefresh();
+    }
+    setSaving(false);
+  };
 
   const handleShare = async () => {
     if (!activePost) return;
@@ -69,20 +106,13 @@ export function ForumMainView({
       activePost.title ||
       (lang === "en" ? "Forum Topic" : "フォーラムトピック");
 
-    // 1. Try Native Web Share API (Mobile / Modern Browsers)
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: shareTitle,
-          url: shareUrl,
-        });
+        await navigator.share({ title: shareTitle, url: shareUrl });
         return;
-      } catch (err) {
-        // User cancelled share dialog or API failed -> fall through to clipboard
-      }
+      } catch (err) {}
     }
 
-    // 2. Desktop Fallback: Copy link to clipboard
     try {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
@@ -204,7 +234,6 @@ export function ForumMainView({
               </div>
 
               <div className="flex items-center gap-1">
-                {/* Share Button */}
                 <button
                   onClick={handleShare}
                   className="flex items-center gap-1.5 text-slate-500 hover:text-[#1f497c] px-2.5 py-1.5 text-xs font-medium transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
@@ -227,22 +256,68 @@ export function ForumMainView({
                   )}
                 </button>
 
-                {/* Instructor Delete Button */}
-                {isInstructor && (
-                  <button
-                    onClick={() => onPromptDelete(activePost.id, false)}
-                    className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
-                    title={lang === "en" ? "Delete Topic" : "トピック削除"}
-                  >
-                    <Trash2 size={18} />
-                  </button>
+                {canModify && !isEditing && (
+                  <>
+                    <button
+                      onClick={startEditing}
+                      className="text-slate-400 hover:text-blue-600 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
+                      title={lang === "en" ? "Edit Topic" : "トピック編集"}
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => onPromptDelete(activePost.id, false)}
+                      className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
+                      title={lang === "en" ? "Delete Topic" : "トピック削除"}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </>
                 )}
               </div>
             </div>
 
-            <p className="text-slate-800 text-base sm:text-lg whitespace-pre-wrap leading-relaxed">
-              {activePost.content}
-            </p>
+            {isEditing ? (
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg p-2 text-base text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1f497c]"
+                />
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  rows={6}
+                  className="w-full border border-slate-300 rounded-lg p-3 text-base text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1f497c]"
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800"
+                  >
+                    {lang === "en" ? "Cancel" : "キャンセル"}
+                  </button>
+                  <button
+                    onClick={handleUpdateTopic}
+                    disabled={saving}
+                    className="px-4 py-2 bg-[#1f497c] text-white text-xs font-semibold rounded-lg"
+                  >
+                    {saving
+                      ? lang === "en"
+                        ? "Saving..."
+                        : "保存中..."
+                      : lang === "en"
+                        ? "Save Changes"
+                        : "変更を保存"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-slate-800 text-base sm:text-lg whitespace-pre-wrap leading-relaxed">
+                {activePost.content}
+              </p>
+            )}
           </article>
 
           <section className="space-y-5">
@@ -253,6 +328,7 @@ export function ForumMainView({
             <ReplyBox
               postId={activePost.id}
               nickname={nickname}
+              sessionId={sessionId}
               isInstructor={isInstructor}
               lang={lang}
               onRefresh={onRefresh}
@@ -264,6 +340,7 @@ export function ForumMainView({
                   key={reply.id}
                   post={reply}
                   nickname={nickname}
+                  sessionId={sessionId}
                   isInstructor={isInstructor}
                   lang={lang}
                   onRefresh={onRefresh}

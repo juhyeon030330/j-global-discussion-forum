@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Search, User, ShieldCheck, X, CheckCircle2 } from "lucide-react";
+import {
+  Plus,
+  Search,
+  User,
+  ShieldCheck,
+  X,
+  CheckCircle2,
+  AlertCircle,
+} from "lucide-react";
 import { Post } from "./types";
 
 interface ForumSidebarProps {
@@ -9,6 +17,7 @@ interface ForumSidebarProps {
   selectedPostId: string | null;
   searchTerm: string;
   nickname: string;
+  nicknameError: string;
   isInstructor: boolean;
   isCreating: boolean;
   mobileOpen: boolean;
@@ -20,7 +29,6 @@ interface ForumSidebarProps {
   onCloseMobile: () => void;
 }
 
-// Helper function to check if a thread contains an instructor reply
 export function hasInstructorReply(post: Post): boolean {
   if (post.is_instructor) return true;
   if (!post.replies || post.replies.length === 0) return false;
@@ -32,6 +40,7 @@ export function ForumSidebar({
   selectedPostId,
   searchTerm,
   nickname,
+  nicknameError,
   isInstructor,
   isCreating,
   mobileOpen,
@@ -44,7 +53,6 @@ export function ForumSidebar({
 }: ForumSidebarProps) {
   const [filterUnanswered, setFilterUnanswered] = useState(false);
 
-  // Filter posts based on search term AND unanswered toggle
   const visiblePosts = posts.filter((post) => {
     if (filterUnanswered && hasInstructorReply(post)) {
       return false;
@@ -97,7 +105,6 @@ export function ForumSidebar({
             />
           </div>
 
-          {/* Filter Chips */}
           <div className="flex items-center gap-1.5 pt-0.5">
             <button
               type="button"
@@ -112,21 +119,33 @@ export function ForumSidebar({
             </button>
           </div>
 
-          <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <User size={13} className="text-[#1f497c] shrink-0" />
-              <input
-                type="text"
-                value={nickname}
-                onChange={(e) => onNicknameChange(e.target.value)}
-                placeholder={lang === "en" ? "Display Name..." : "表示名..."}
-                className="w-full border border-slate-200 rounded px-2 py-1 text-xs bg-white focus:outline-none focus:border-[#1f497c]"
-              />
+          {/* Clean Nickname Header */}
+          <div className="pt-1 border-t border-slate-100 space-y-1">
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <User size={13} className="text-[#1f497c] shrink-0" />
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={(e) => onNicknameChange(e.target.value)}
+                  placeholder={lang === "en" ? "Display Name..." : "表示名..."}
+                  className={`w-full border rounded px-2 py-1 text-xs bg-white focus:outline-none ${
+                    nicknameError
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-slate-200 focus:border-[#1f497c]"
+                  }`}
+                />
+              </div>
+              {isInstructor && (
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
+                  <ShieldCheck size={11} /> {lang === "en" ? "Inst." : "講師"}
+                </span>
+              )}
             </div>
-            {isInstructor && (
-              <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
-                <ShieldCheck size={11} /> {lang === "en" ? "Inst." : "講師"}
-              </span>
+            {nicknameError && (
+              <p className="text-[10px] text-red-500 flex items-center gap-1 pl-5">
+                <AlertCircle size={11} /> {nicknameError}
+              </p>
             )}
           </div>
         </div>
