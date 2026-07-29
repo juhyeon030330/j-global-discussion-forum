@@ -13,6 +13,7 @@ function ForumContent() {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>("");
   const [nicknameError, setNicknameError] = useState<string>("");
+  const [nicknameConfirmed, setNicknameConfirmed] = useState<boolean>(false);
   const [sessionId, setSessionId] = useState<string>("");
   const [isInstructor, setIsInstructor] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -21,6 +22,7 @@ function ForumContent() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
+  const [showNicknameManager, setShowNicknameManager] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [passError, setPassError] = useState("");
 
@@ -39,7 +41,6 @@ function ForumContent() {
   const supabase = createClient();
 
   useEffect(() => {
-    // Generate or fetch unique invisible session token
     let currentSession = localStorage.getItem("forum_session_id");
     if (!currentSession) {
       currentSession =
@@ -82,17 +83,22 @@ function ForumContent() {
     };
   }, []);
 
-  const handleNicknameChange = async (val: string) => {
+  // Handle typing nickname without immediate automatic claim on every key
+  const handleNicknameChange = (val: string) => {
     setNickname(val);
     setNicknameError("");
+    setNicknameConfirmed(false);
 
-    const trimmed = val.trim();
-    if (!trimmed) {
+    if (!val.trim()) {
       localStorage.removeItem("forum_nickname");
-      return;
     }
+  };
 
-    // Check if nickname is taken by another session
+  // Explicit claim function triggered on button click or blur
+  const handleClaimNickname = async () => {
+    const trimmed = nickname.trim();
+    if (!trimmed) return;
+
     const { data } = await supabase
       .from("reserved_nicknames")
       .select("session_id")
@@ -105,14 +111,17 @@ function ForumContent() {
           ? "Nickname is currently in use by another user"
           : "この表示名は別のユーザーによって使用されています",
       );
+      setNicknameConfirmed(false);
     } else {
-      // Claim nickname for this session
       await supabase.from("reserved_nicknames").upsert({
         nickname: trimmed,
         session_id: sessionId,
         updated_at: new Date().toISOString(),
       });
       localStorage.setItem("forum_nickname", trimmed);
+      setNicknameError("");
+      setNicknameConfirmed(true);
+      setTimeout(() => setNicknameConfirmed(false), 3000);
     }
   };
 
@@ -287,6 +296,7 @@ function ForumContent() {
         searchTerm={searchTerm}
         nickname={nickname}
         nicknameError={nicknameError}
+        nicknameConfirmed={nicknameConfirmed}
         isInstructor={isInstructor}
         isCreating={isCreating}
         mobileOpen={mobileOpen}
@@ -298,6 +308,8 @@ function ForumContent() {
         }}
         onSearchChange={setSearchTerm}
         onNicknameChange={handleNicknameChange}
+        onClaimNickname={handleClaimNickname}
+        onOpenNicknameManager={() => setShowNicknameManager(true)}
         onCloseMobile={() => setMobileOpen(false)}
       />
 
@@ -325,6 +337,7 @@ function ForumContent() {
         passcode={passcode}
         passError={passError}
         deleteModal={deleteModal}
+        showNicknameManager={showNicknameManager}
         lang={lang}
         setPasscode={setPasscode}
         onCloseInstructorModal={() => setShowModal(false)}
@@ -333,6 +346,7 @@ function ForumContent() {
           setDeleteModal({ isOpen: false, id: null, isReply: false })
         }
         onConfirmDelete={confirmDelete}
+        onCloseNicknameManager={() => setShowNicknameManager(false)}
       />
     </div>
   );

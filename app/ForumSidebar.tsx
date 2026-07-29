@@ -9,6 +9,8 @@ import {
   X,
   CheckCircle2,
   AlertCircle,
+  Check,
+  Settings,
 } from "lucide-react";
 import { Post } from "./types";
 
@@ -18,6 +20,7 @@ interface ForumSidebarProps {
   searchTerm: string;
   nickname: string;
   nicknameError: string;
+  nicknameConfirmed: boolean;
   isInstructor: boolean;
   isCreating: boolean;
   mobileOpen: boolean;
@@ -26,6 +29,8 @@ interface ForumSidebarProps {
   onStartCreating: () => void;
   onSearchChange: (val: string) => void;
   onNicknameChange: (val: string) => void;
+  onClaimNickname: () => void;
+  onOpenNicknameManager: () => void;
   onCloseMobile: () => void;
 }
 
@@ -41,6 +46,7 @@ export function ForumSidebar({
   searchTerm,
   nickname,
   nicknameError,
+  nicknameConfirmed,
   isInstructor,
   isCreating,
   mobileOpen,
@@ -49,6 +55,8 @@ export function ForumSidebar({
   onStartCreating,
   onSearchChange,
   onNicknameChange,
+  onClaimNickname,
+  onOpenNicknameManager,
   onCloseMobile,
 }: ForumSidebarProps) {
   const [filterUnanswered, setFilterUnanswered] = useState(false);
@@ -105,7 +113,7 @@ export function ForumSidebar({
             />
           </div>
 
-          <div className="flex items-center gap-1.5 pt-0.5">
+          <div className="flex items-center justify-between gap-1.5 pt-0.5">
             <button
               type="button"
               onClick={() => setFilterUnanswered(!filterUnanswered)}
@@ -117,9 +125,25 @@ export function ForumSidebar({
             >
               {lang === "en" ? "Needs Answer" : "未回答のみ"}
             </button>
+
+            {isInstructor && (
+              <button
+                type="button"
+                onClick={onOpenNicknameManager}
+                className="text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg flex items-center gap-1 cursor-pointer"
+                title={
+                  lang === "en"
+                    ? "Manage Reserved Nicknames"
+                    : "使用中名前の管理"
+                }
+              >
+                <Settings size={12} />
+                {lang === "en" ? "Names" : "名前管理"}
+              </button>
+            )}
           </div>
 
-          {/* Clean Nickname Header */}
+          {/* Clean Nickname Header with Claim Button & Status */}
           <div className="pt-1 border-t border-slate-100 space-y-1">
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -136,15 +160,36 @@ export function ForumSidebar({
                   }`}
                 />
               </div>
+
+              {nickname.trim() && (
+                <button
+                  type="button"
+                  onClick={onClaimNickname}
+                  className="px-2 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded cursor-pointer shrink-0"
+                >
+                  {lang === "en" ? "Claim" : "確定"}
+                </button>
+              )}
+
               {isInstructor && (
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
                   <ShieldCheck size={11} /> {lang === "en" ? "Inst." : "講師"}
                 </span>
               )}
             </div>
+
             {nicknameError && (
               <p className="text-[10px] text-red-500 flex items-center gap-1 pl-5">
                 <AlertCircle size={11} /> {nicknameError}
+              </p>
+            )}
+
+            {nicknameConfirmed && !nicknameError && (
+              <p className="text-[10px] text-emerald-600 flex items-center gap-1 pl-5 font-semibold">
+                <Check size={11} />{" "}
+                {lang === "en"
+                  ? `Claimed name "${nickname}"`
+                  : `"${nickname}" を確保しました`}
               </p>
             )}
           </div>
