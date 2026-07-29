@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Post } from "./types";
@@ -8,7 +8,7 @@ import { ForumSidebar } from "./ForumSidebar";
 import { ForumMainView } from "./ForumMainView";
 import { ForumModals } from "./ForumModals";
 
-export default function ForumPage() {
+function ForumContent() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [nickname, setNickname] = useState<string>("");
@@ -271,5 +271,19 @@ export default function ForumPage() {
         onConfirmDelete={confirmDelete}
       />
     </div>
+  );
+}
+
+export default function ForumPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex-1 flex items-center justify-center h-full text-slate-400 text-sm">
+          Loading forum...
+        </div>
+      }
+    >
+      <ForumContent />
+    </Suspense>
   );
 }
