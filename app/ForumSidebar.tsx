@@ -1,6 +1,7 @@
 "use client";
 
-import { Plus, Search, User, ShieldCheck, X } from "lucide-react";
+import { useState } from "react";
+import { Plus, Search, User, ShieldCheck, X, CheckCircle2 } from "lucide-react";
 import { Post } from "./types";
 
 interface ForumSidebarProps {
@@ -19,6 +20,13 @@ interface ForumSidebarProps {
   onCloseMobile: () => void;
 }
 
+// Helper function to check if a thread contains an instructor reply
+export function hasInstructorReply(post: Post): boolean {
+  if (post.is_instructor) return true;
+  if (!post.replies || post.replies.length === 0) return false;
+  return post.replies.some((reply) => hasInstructorReply(reply));
+}
+
 export function ForumSidebar({
   posts,
   selectedPostId,
@@ -34,6 +42,16 @@ export function ForumSidebar({
   onNicknameChange,
   onCloseMobile,
 }: ForumSidebarProps) {
+  const [filterUnanswered, setFilterUnanswered] = useState(false);
+
+  // Filter posts based on search term AND unanswered toggle
+  const visiblePosts = posts.filter((post) => {
+    if (filterUnanswered && hasInstructorReply(post)) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <>
       {mobileOpen && (
@@ -79,6 +97,21 @@ export function ForumSidebar({
             />
           </div>
 
+          {/* Filter Chips */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setFilterUnanswered(!filterUnanswered)}
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                filterUnanswered
+                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                  : "bg-white text-slate-600 border-slate-200 hover:bg-slate-100"
+              }`}
+            >
+              {lang === "en" ? "Needs Answer" : "未回答のみ"}
+            </button>
+          </div>
+
           <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-slate-100">
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <User size={13} className="text-[#1f497c] shrink-0" />
@@ -99,8 +132,10 @@ export function ForumSidebar({
         </div>
 
         <div className="flex-1 overflow-y-auto divide-y divide-slate-100">
-          {posts.map((post) => {
+          {visiblePosts.map((post) => {
             const isSelected = post.id === selectedPostId && !isCreating;
+            const isAnsweredByInstructor = hasInstructorReply(post);
+
             return (
               <div
                 key={post.id}
@@ -130,16 +165,33 @@ export function ForumSidebar({
                     {new Date(post.created_at).toLocaleDateString()}
                   </span>
                 </div>
+
                 <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-1.5">
                   {post.content}
                 </p>
+
                 <div className="flex justify-between items-center text-[10px] text-slate-400">
-                  <span className="font-medium text-slate-600 truncate">
+                  <span className="font-medium text-slate-600 truncate max-w-[110px]">
                     {post.author_name}
                   </span>
-                  <span className="bg-slate-100 px-1.5 py-0.5 rounded-full text-[10px]">
-                    {post.replies?.length || 0}
-                  </span>
+
+                  <div className="flex items-center gap-1.5">
+                    {isAnsweredByInstructor && (
+                      <span
+                        className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5 shrink-0"
+                        title={
+                          lang === "en" ? "Instructor Answered" : "講師回答済み"
+                        }
+                      >
+                        <CheckCircle2 size={10} />
+                        {lang === "en" ? "Answered" : "回答済"}
+                      </span>
+                    )}
+
+                    <span className="bg-slate-100 px-1.5 py-0.5 rounded-full text-[10px]">
+                      {post.replies?.length || 0}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

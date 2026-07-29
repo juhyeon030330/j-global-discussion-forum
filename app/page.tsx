@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Post } from "./types";
 import { ForumSidebar } from "./ForumSidebar";
@@ -31,6 +32,8 @@ export default function ForumPage() {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
 
   useEffect(() => {
@@ -66,6 +69,51 @@ export default function ForumPage() {
     };
   }, []);
 
+  const handleSelectPost = (id: string) => {
+    setSelectedPostId(id);
+    setIsCreating(false);
+    setMobileOpen(false);
+    // Sync to URL query param
+    router.push(`?post=${id}`, { scroll: false });
+  };
+
+  const fetchPosts = async () => {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      const tree = buildThreadTree(data as Post[]);
+      setPosts(tree);
+
+      // Check URL search parameter for direct deep link
+      const urlPostId = searchParams.get("post");
+      if (urlPostId && tree.some((p) => p.id === urlPostId)) {
+        setSelectedPostId(urlPostId);
+      } else if (tree.length > 0 && !selectedPostId) {
+        setSelectedPostId(tree[0].id);
+      }
+    }
+  };
+
+  const buildThreadTree = (postsList: Post[]): Post[] => {
+    const postMap = new Map<string, Post>();
+    const roots: Post[] = [];
+
+    postsList.forEach((p) => postMap.set(p.id, { ...p, replies: [] }));
+    postsList.forEach((p) => {
+      const node = postMap.get(p.id)!;
+      if (p.parent_id && postMap.has(p.parent_id)) {
+        postMap.get(p.parent_id)!.replies!.push(node);
+      } else if (!p.parent_id) {
+        roots.push(node);
+      }
+    });
+
+    return roots.reverse();
+  };
+
   const handleNicknameChange = (val: string) => {
     setNickname(val);
     localStorage.setItem("forum_nickname", val);
@@ -87,38 +135,6 @@ export default function ForumPage() {
           : "パスワードが正しくありません。再入力してください。",
       );
     }
-  };
-
-  const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (!error && data) {
-      const tree = buildThreadTree(data as Post[]);
-      setPosts(tree);
-      if (tree.length > 0 && !selectedPostId) {
-        setSelectedPostId(tree[0].id);
-      }
-    }
-  };
-
-  const buildThreadTree = (postsList: Post[]): Post[] => {
-    const postMap = new Map<string, Post>();
-    const roots: Post[] = [];
-
-    postsList.forEach((p) => postMap.set(p.id, { ...p, replies: [] }));
-    postsList.forEach((p) => {
-      const node = postMap.get(p.id)!;
-      if (p.parent_id && postMap.has(p.parent_id)) {
-        postMap.get(p.parent_id)!.replies!.push(node);
-      } else if (!p.parent_id) {
-        roots.push(node);
-      }
-    });
-
-    return roots.reverse();
   };
 
   const handleCreatePost = async (e: React.FormEvent) => {
@@ -152,7 +168,7 @@ export default function ForumPage() {
       setContent("");
       setIsCreating(false);
       await fetchPosts();
-      if (data && data[0]) setSelectedPostId(data[0].id);
+      if (data && data[0]) handleSelectPost(data[0].id);
     } else {
       alert(
         (lang === "en" ? "Failed to create post: " : "投稿に失敗しました: ") +
@@ -212,11 +228,7 @@ export default function ForumPage() {
         isCreating={isCreating}
         mobileOpen={mobileOpen}
         lang={lang}
-        onSelectPost={(id) => {
-          setSelectedPostId(id);
-          setIsCreating(false);
-          setMobileOpen(false);
-        }}
+        onSelectPost={handleSelectPost}
         onStartCreating={() => {
           setIsCreating(true);
           setMobileOpen(false);

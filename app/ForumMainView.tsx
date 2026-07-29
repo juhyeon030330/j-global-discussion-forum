@@ -1,6 +1,15 @@
 "use client";
 
-import { MessageSquare, ShieldCheck, Trash2, Menu } from "lucide-react";
+import { useState } from "react";
+import {
+  MessageSquare,
+  ShieldCheck,
+  Trash2,
+  Menu,
+  CheckCircle2,
+  Share2,
+  Check,
+} from "lucide-react";
 import { Post } from "./types";
 import { ReplyBox, ThreadItem } from "./ThreadComponents";
 
@@ -22,6 +31,13 @@ interface ForumMainViewProps {
   onRefresh: () => void;
 }
 
+// Check if any reply in this thread comes from an instructor
+function hasInstructorReply(post: Post): boolean {
+  if (post.is_instructor) return true;
+  if (!post.replies || post.replies.length === 0) return false;
+  return post.replies.some((reply) => hasInstructorReply(reply));
+}
+
 export function ForumMainView({
   activePost,
   isCreating,
@@ -39,6 +55,43 @@ export function ForumMainView({
   onPromptDelete,
   onRefresh,
 }: ForumMainViewProps) {
+  const [copied, setCopied] = useState(false);
+
+  const isAnsweredByInstructor = activePost
+    ? hasInstructorReply(activePost)
+    : false;
+
+  const handleShare = async () => {
+    if (!activePost) return;
+
+    const shareUrl = `${window.location.origin}${window.location.pathname}?post=${activePost.id}`;
+    const shareTitle =
+      activePost.title ||
+      (lang === "en" ? "Forum Topic" : "フォーラムトピック");
+
+    // 1. Try Native Web Share API (Mobile / Modern Browsers)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          url: shareUrl,
+        });
+        return;
+      } catch (err) {
+        // User cancelled share dialog or API failed -> fall through to clipboard
+      }
+    }
+
+    // 2. Desktop Fallback: Copy link to clipboard
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy link: ", err);
+    }
+  };
+
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="sm:hidden flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200">
@@ -133,6 +186,12 @@ export function ForumMainView({
                       {lang === "en" ? "INSTRUCTOR" : "講師"}
                     </span>
                   )}
+                  {isAnsweredByInstructor && !activePost.is_instructor && (
+                    <span className="bg-emerald-100 text-emerald-900 text-xs font-extrabold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <CheckCircle2 size={14} className="text-emerald-700" />{" "}
+                      {lang === "en" ? "INSTRUCTOR ANSWERED" : "講師回答済み"}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
                   {lang === "en" ? "Posted by " : "投稿者: "}
@@ -144,15 +203,41 @@ export function ForumMainView({
                 </p>
               </div>
 
-              {isInstructor && (
+              <div className="flex items-center gap-1">
+                {/* Share Button */}
                 <button
-                  onClick={() => onPromptDelete(activePost.id, false)}
-                  className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
-                  title={lang === "en" ? "Delete Topic" : "トピック削除"}
+                  onClick={handleShare}
+                  className="flex items-center gap-1.5 text-slate-500 hover:text-[#1f497c] px-2.5 py-1.5 text-xs font-medium transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
+                  title={lang === "en" ? "Share Topic" : "トピックを共有"}
                 >
-                  <Trash2 size={18} />
+                  {copied ? (
+                    <>
+                      <Check size={15} className="text-emerald-600" />
+                      <span className="text-emerald-600 font-semibold">
+                        {lang === "en" ? "Copied!" : "コピー完了!"}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 size={16} />
+                      <span className="hidden sm:inline">
+                        {lang === "en" ? "Share" : "共有"}
+                      </span>
+                    </>
+                  )}
                 </button>
-              )}
+
+                {/* Instructor Delete Button */}
+                {isInstructor && (
+                  <button
+                    onClick={() => onPromptDelete(activePost.id, false)}
+                    className="text-slate-400 hover:text-red-500 p-2 transition-colors rounded-lg hover:bg-slate-100 cursor-pointer"
+                    title={lang === "en" ? "Delete Topic" : "トピック削除"}
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                )}
+              </div>
             </div>
 
             <p className="text-slate-800 text-base sm:text-lg whitespace-pre-wrap leading-relaxed">
