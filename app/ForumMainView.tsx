@@ -110,7 +110,9 @@ export function ForumMainView({
       try {
         await navigator.share({ title: shareTitle, url: shareUrl });
         return;
-      } catch (err) {}
+      } catch (err: any) {
+        if (err.name === "AbortError") return;
+      }
     }
 
     try {
@@ -123,7 +125,7 @@ export function ForumMainView({
   };
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
       <div className="sm:hidden flex items-center justify-between px-4 py-2.5 bg-white border-b border-slate-200">
         <button
           onClick={onOpenMobile}
@@ -178,7 +180,7 @@ export function ForumMainView({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="bg-[#1f497c] text-white font-semibold py-2.5 px-6 rounded-xl text-sm shadow-sm cursor-pointer"
+                  className="bg-[#1f497c] text-white font-semibold py-2.5 px-6 rounded-xl text-sm shadow-sm cursor-pointer disabled:opacity-50"
                 >
                   {loading
                     ? lang === "en"
@@ -301,7 +303,7 @@ export function ForumMainView({
                   <button
                     onClick={handleUpdateTopic}
                     disabled={saving}
-                    className="px-4 py-2 bg-[#1f497c] text-white text-xs font-semibold rounded-lg"
+                    className="px-4 py-2 bg-[#1f497c] text-white text-xs font-semibold rounded-lg disabled:opacity-50"
                   >
                     {saving
                       ? lang === "en"
@@ -357,6 +359,6 @@ export function ForumMainView({
             : "サイドバーからトピックを選択してください。"}
         </div>
       )}
-    </main>
+    </div>
   );
 }

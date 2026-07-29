@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Post } from "./types";
@@ -39,6 +39,42 @@ function ForumContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+
+  const buildThreadTree = (postsList: Post[]): Post[] => {
+    const postMap = new Map<string, Post>();
+    const roots: Post[] = [];
+
+    postsList.forEach((p) => postMap.set(p.id, { ...p, replies: [] }));
+    postsList.forEach((p) => {
+      const node = postMap.get(p.id)!;
+      if (p.parent_id && postMap.has(p.parent_id)) {
+        postMap.get(p.parent_id)!.replies!.push(node);
+      } else if (!p.parent_id) {
+        roots.push(node);
+      }
+    });
+
+    return roots.reverse();
+  };
+
+  const fetchPosts = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (!error && data) {
+      const tree = buildThreadTree(data as Post[]);
+      setPosts(tree);
+
+      const urlPostId = searchParams.get("post");
+      if (urlPostId && tree.some((p) => p.id === urlPostId)) {
+        setSelectedPostId(urlPostId);
+      } else if (tree.length > 0 && !selectedPostId) {
+        setSelectedPostId(tree[0].id);
+      }
+    }
+  }, [supabase, searchParams, selectedPostId]);
 
   useEffect(() => {
     let currentSession = localStorage.getItem("forum_session_id");
@@ -83,7 +119,14 @@ function ForumContent() {
     };
   }, []);
 
-  // Handle typing nickname without immediate automatic claim on every key
+  // Sync selected post when URL param changes via back/forward buttons
+  useEffect(() => {
+    const urlPostId = searchParams.get("post");
+    if (urlPostId && urlPostId !== selectedPostId) {
+      setSelectedPostId(urlPostId);
+    }
+  }, [searchParams]);
+
   const handleNicknameChange = (val: string) => {
     setNickname(val);
     setNicknameError("");
@@ -94,7 +137,6 @@ function ForumContent() {
     }
   };
 
-  // Explicit claim function triggered on button click or blur
   const handleClaimNickname = async () => {
     const trimmed = nickname.trim();
     if (!trimmed) return;
@@ -130,42 +172,6 @@ function ForumContent() {
     setIsCreating(false);
     setMobileOpen(false);
     router.push(`?post=${id}`, { scroll: false });
-  };
-
-  const fetchPosts = async () => {
-    const { data, error } = await supabase
-      .from("posts")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (!error && data) {
-      const tree = buildThreadTree(data as Post[]);
-      setPosts(tree);
-
-      const urlPostId = searchParams.get("post");
-      if (urlPostId && tree.some((p) => p.id === urlPostId)) {
-        setSelectedPostId(urlPostId);
-      } else if (tree.length > 0 && !selectedPostId) {
-        setSelectedPostId(tree[0].id);
-      }
-    }
-  };
-
-  const buildThreadTree = (postsList: Post[]): Post[] => {
-    const postMap = new Map<string, Post>();
-    const roots: Post[] = [];
-
-    postsList.forEach((p) => postMap.set(p.id, { ...p, replies: [] }));
-    postsList.forEach((p) => {
-      const node = postMap.get(p.id)!;
-      if (p.parent_id && postMap.has(p.parent_id)) {
-        postMap.get(p.parent_id)!.replies!.push(node);
-      } else if (!p.parent_id) {
-        roots.push(node);
-      }
-    });
-
-    return roots.reverse();
   };
 
   const handleInstructorLogin = (e: React.FormEvent) => {
@@ -228,6 +234,17 @@ function ForumContent() {
     setLoading(false);
   };
 
+  const findPostById = (list: Post[], targetId: string): Post | null => {
+    for (const p of list) {
+      if (p.id === targetId) return p;
+      if (p.replies) {
+        const found = findPostById(p.replies, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   const promptDelete = (id: string) => {
     const postToDelete = findPostById(posts, id);
     if (
@@ -243,17 +260,6 @@ function ForumContent() {
     });
   };
 
-  const findPostById = (list: Post[], targetId: string): Post | null => {
-    for (const p of list) {
-      if (p.id === targetId) return p;
-      if (p.replies) {
-        const found = findPostById(p.replies, targetId);
-        if (found) return found;
-      }
-    }
-    return null;
-  };
-
   const confirmDelete = async () => {
     if (!deleteModal.id) return;
     const targetId = deleteModal.id;
@@ -261,7 +267,16 @@ function ForumContent() {
 
     const { error } = await supabase.from("posts").delete().eq("id", targetId);
     if (!error) {
-      if (selectedPostId === targetId) setSelectedPostId(null);
+      if (selectedPostId === targetId) {
+        const remaining = posts.filter((p) => p.id !== targetId);
+        const nextSelected = remaining.length > 0 ? remaining[0].id : null;
+        setSelectedPostId(nextSelected);
+        if (nextSelected) {
+          router.push(`?post=${nextSelected}`, { scroll: false });
+        } else {
+          router.push(window.location.pathname, { scroll: false });
+        }
+      }
       fetchPosts();
     } else {
       alert(
