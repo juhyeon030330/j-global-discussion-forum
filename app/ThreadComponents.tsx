@@ -71,7 +71,7 @@ export function ReplyBox({
         await supabase.from("notifications").insert({
           user_session_id: targetSessionId,
           target_role: targetRole,
-          post_id: targetPost?.id || postId,
+          post_id: newReply.id, // Fixed: point directly to Jack's new reply ID instead of targetPost.id
           actor_name: author,
           message:
             lang === "en"

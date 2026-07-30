@@ -73,7 +73,7 @@ function ForumContent() {
     [],
   );
 
-  const fetchPosts = useCallback(async () => {
+  const fetchPosts = useCallback(async (): Promise<Post[]> => {
     const { data, error } = await supabase
       .from("posts")
       .select("*")
@@ -90,7 +90,9 @@ function ForumContent() {
       } else if (tree.length > 0 && !selectedPostId) {
         setSelectedPostId(tree[0].id);
       }
+      return tree;
     }
+    return [];
   }, [supabase, searchParams, selectedPostId, findRootPostId]);
 
   useEffect(() => {
@@ -122,53 +124,49 @@ function ForumContent() {
 
     const handleOpenModal = () => setShowModal(true);
 
-    const handleNavigatePost = (e: CustomEvent<string>) => {
-      const targetId = e.detail;
+    const handleNavigatePost = async (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      const targetId = customEvent.detail;
       if (!targetId) return;
 
-      // Calculate rootId outside of setPosts state updater
-      setPosts((currentPosts) => {
-        const rootId = findRootPostId(currentPosts, targetId) || targetId;
+      // 1. Fetch latest posts so the new reply exists in state
+      const freshTree = await fetchPosts();
+      const treeToUse = freshTree.length > 0 ? freshTree : posts;
+      const rootId = findRootPostId(treeToUse, targetId) || targetId;
 
-        // Queue side-effects cleanly on next microtask
-        queueMicrotask(() => {
-          setSelectedPostId(rootId);
-          setIsCreating(false);
-          setMobileOpen(false);
-          router.push(`?post=${rootId}`, { scroll: false });
+      setSelectedPostId(rootId);
+      setIsCreating(false);
+      setMobileOpen(false);
+      router.push(`?post=${rootId}`, { scroll: false });
 
-          setTimeout(() => {
-            const element = document.getElementById(`post-${targetId}`);
-            if (element) {
-              element.scrollIntoView({ behavior: "smooth", block: "center" });
-              element.classList.add(
+      // 2. Wait for React to re-render the thread with the new reply node
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          const element = document.getElementById(`post-${targetId}`);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth", block: "center" });
+            element.classList.add(
+              "ring-2",
+              "ring-amber-400",
+              "bg-amber-100/50",
+            );
+
+            setTimeout(() => {
+              element.classList.remove(
                 "ring-2",
                 "ring-amber-400",
                 "bg-amber-100/50",
               );
-
-              setTimeout(() => {
-                element.classList.remove(
-                  "ring-2",
-                  "ring-amber-400",
-                  "bg-amber-100/50",
-                );
-              }, 2500);
-            }
-          }, 200);
+            }, 2500);
+          }
         });
-
-        return currentPosts;
-      });
+      }, 350);
     };
 
     window.addEventListener("open-instructor-modal", handleOpenModal);
     window.addEventListener("instructor-status-changed", checkInstructorStatus);
     window.addEventListener("lang-changed", checkLang);
-    window.addEventListener(
-      "navigate-post",
-      handleNavigatePost as EventListener,
-    );
+    window.addEventListener("navigate-post", handleNavigatePost);
 
     return () => {
       window.removeEventListener("open-instructor-modal", handleOpenModal);
@@ -177,10 +175,7 @@ function ForumContent() {
         checkInstructorStatus,
       );
       window.removeEventListener("lang-changed", checkLang);
-      window.removeEventListener(
-        "navigate-post",
-        handleNavigatePost as EventListener,
-      );
+      window.removeEventListener("navigate-post", handleNavigatePost);
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
