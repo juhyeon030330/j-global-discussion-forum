@@ -16,11 +16,10 @@ import "./globals.css";
 import { createClient } from "@/utils/supabase/client";
 import { Notification } from "./types";
 
-function HeaderControls() {
+function HeaderControls({ lang }: { lang: "en" | "jp" }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [isInstructor, setIsInstructor] = useState(false);
-  const [lang, setLang] = useState<"en" | "jp">("en");
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -40,26 +39,16 @@ function HeaderControls() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch & Subscribe Notifications
   useEffect(() => {
     const checkStatus = () => {
       setIsInstructor(localStorage.getItem("forum_is_instructor") === "true");
     };
 
-    const checkLang = () => {
-      const savedLang = localStorage.getItem("forum_lang") as "en" | "jp";
-      if (savedLang) setLang(savedLang);
-    };
-
     checkStatus();
-    checkLang();
-
     window.addEventListener("instructor-status-changed", checkStatus);
-    window.addEventListener("lang-changed", checkLang);
 
     return () => {
       window.removeEventListener("instructor-status-changed", checkStatus);
-      window.removeEventListener("lang-changed", checkLang);
     };
   }, []);
 
@@ -117,7 +106,6 @@ function HeaderControls() {
 
   const handleSetLang = (targetLang: "en" | "jp") => {
     if (lang === targetLang) return;
-    setLang(targetLang);
     localStorage.setItem("forum_lang", targetLang);
     window.dispatchEvent(new CustomEvent("lang-changed"));
   };
@@ -127,7 +115,6 @@ function HeaderControls() {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     setNotifOpen(false);
 
-    // Dispatch event to switch active post
     window.dispatchEvent(new CustomEvent("navigate-post", { detail: postId }));
   };
 
@@ -143,17 +130,6 @@ function HeaderControls() {
 
   return (
     <div className="flex items-center gap-3 md:gap-4 shrink-0 relative">
-      {/* Breadcrumbs */}
-      <div className="hidden sm:flex items-center text-xs font-bold text-slate-700 leading-none h-5 mr-2">
-        <span className="inline-block tracking-tight">
-          {lang === "en" ? "Dashboard" : "ダッシュボード"}
-        </span>
-        <span className="mx-2 text-slate-300 font-normal">/</span>
-        <span className="inline-block text-slate-900 tracking-tight">
-          {lang === "en" ? "Forum" : "フォーラム"}
-        </span>
-      </div>
-
       {/* Language Switcher */}
       <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200/80 text-xs font-semibold select-none">
         <button
@@ -317,11 +293,25 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [lang, setLang] = useState<"en" | "jp">("en");
+
+  useEffect(() => {
+    const checkLang = () => {
+      const savedLang = localStorage.getItem("forum_lang") as "en" | "jp";
+      if (savedLang) setLang(savedLang);
+    };
+
+    checkLang();
+    window.addEventListener("lang-changed", checkLang);
+    return () => window.removeEventListener("lang-changed", checkLang);
+  }, []);
+
   return (
     <html lang="en" className="h-full">
       <body className="h-full bg-slate-50 text-slate-900 flex flex-col antialiased font-sans overflow-hidden">
         <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 bg-white px-4 md:px-8 shadow-sm">
-          <div className="flex items-center gap-4 min-w-0">
+          {/* Left container: Logo + Breadcrumbs */}
+          <div className="flex items-center gap-4 sm:gap-6 min-w-0">
             <Link
               href="/"
               className="flex items-center justify-center shrink-0"
@@ -335,9 +325,20 @@ export default function RootLayout({
                 priority
               />
             </Link>
+
+            {/* Moved Breadcrumbs here */}
+            <div className="hidden sm:flex items-center text-xs font-bold text-slate-700 leading-none h-5">
+              <span className="inline-block tracking-tight">
+                {lang === "en" ? "Dashboard" : "ダッシュボード"}
+              </span>
+              <span className="mx-2 text-slate-300 font-normal">/</span>
+              <span className="inline-block text-slate-900 tracking-tight">
+                {lang === "en" ? "Forum" : "フォーラム"}
+              </span>
+            </div>
           </div>
 
-          <HeaderControls />
+          <HeaderControls lang={lang} />
         </header>
 
         <div className="flex-1 flex overflow-hidden">{children}</div>
