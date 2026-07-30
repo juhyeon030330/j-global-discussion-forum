@@ -57,6 +57,22 @@ function ForumContent() {
     return roots.reverse();
   };
 
+  const findRootPostId = useCallback(
+    (tree: Post[], targetId: string): string | null => {
+      for (const rootPost of tree) {
+        const containsPost = (node: Post, id: string): boolean => {
+          if (node.id === id) return true;
+          return node.replies?.some((r) => containsPost(r, id)) ?? false;
+        };
+        if (containsPost(rootPost, targetId)) {
+          return rootPost.id;
+        }
+      }
+      return null;
+    },
+    [],
+  );
+
   const fetchPosts = useCallback(async () => {
     const { data, error } = await supabase
       .from("posts")
@@ -68,13 +84,14 @@ function ForumContent() {
       setPosts(tree);
 
       const urlPostId = searchParams.get("post");
-      if (urlPostId && tree.some((p) => p.id === urlPostId)) {
-        setSelectedPostId(urlPostId);
+      if (urlPostId) {
+        const rootId = findRootPostId(tree, urlPostId);
+        if (rootId) setSelectedPostId(rootId);
       } else if (tree.length > 0 && !selectedPostId) {
         setSelectedPostId(tree[0].id);
       }
     }
-  }, [supabase, searchParams, selectedPostId]);
+  }, [supabase, searchParams, selectedPostId, findRootPostId]);
 
   useEffect(() => {
     let currentSession = localStorage.getItem("forum_session_id");
@@ -104,8 +121,45 @@ function ForumContent() {
     fetchPosts();
 
     const handleOpenModal = () => setShowModal(true);
+
     const handleNavigatePost = (e: CustomEvent<string>) => {
-      if (e.detail) handleSelectPost(e.detail);
+      const targetId = e.detail;
+      if (!targetId) return;
+
+      // Calculate rootId outside of setPosts state updater
+      setPosts((currentPosts) => {
+        const rootId = findRootPostId(currentPosts, targetId) || targetId;
+
+        // Queue side-effects cleanly on next microtask
+        queueMicrotask(() => {
+          setSelectedPostId(rootId);
+          setIsCreating(false);
+          setMobileOpen(false);
+          router.push(`?post=${rootId}`, { scroll: false });
+
+          setTimeout(() => {
+            const element = document.getElementById(`post-${targetId}`);
+            if (element) {
+              element.scrollIntoView({ behavior: "smooth", block: "center" });
+              element.classList.add(
+                "ring-2",
+                "ring-amber-400",
+                "bg-amber-100/50",
+              );
+
+              setTimeout(() => {
+                element.classList.remove(
+                  "ring-2",
+                  "ring-amber-400",
+                  "bg-amber-100/50",
+                );
+              }, 2500);
+            }
+          }, 200);
+        });
+
+        return currentPosts;
+      });
     };
 
     window.addEventListener("open-instructor-modal", handleOpenModal);
@@ -128,14 +182,17 @@ function ForumContent() {
         handleNavigatePost as EventListener,
       );
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const urlPostId = searchParams.get("post");
-    if (urlPostId && urlPostId !== selectedPostId) {
-      setSelectedPostId(urlPostId);
+    if (urlPostId && posts.length > 0) {
+      const rootId = findRootPostId(posts, urlPostId) || urlPostId;
+      if (rootId !== selectedPostId) {
+        setSelectedPostId(rootId);
+      }
     }
-  }, [searchParams]);
+  }, [searchParams, posts, findRootPostId, selectedPostId]);
 
   const handleNicknameChange = (val: string) => {
     setNickname(val);
@@ -178,10 +235,11 @@ function ForumContent() {
   };
 
   const handleSelectPost = (id: string) => {
-    setSelectedPostId(id);
+    const rootId = findRootPostId(posts, id) || id;
+    setSelectedPostId(rootId);
     setIsCreating(false);
     setMobileOpen(false);
-    router.push(`?post=${id}`, { scroll: false });
+    router.push(`?post=${rootId}`, { scroll: false });
   };
 
   const handleInstructorLogin = (e: React.FormEvent) => {

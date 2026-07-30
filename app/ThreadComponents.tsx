@@ -7,7 +7,7 @@ import { Post } from "./types";
 
 export function ReplyBox({
   postId,
-  targetPost, // Added targetPost to know who we are notifying
+  targetPost,
   nickname,
   sessionId,
   isInstructor,
@@ -54,10 +54,6 @@ export function ReplyBox({
       .single();
 
     if (!error && newReply) {
-      // Determine recipient:
-      // If an instructor is replying -> target recipient is the student user
-      // If a student is replying to an instructor post -> target recipient is the instructor
-      // If a student is replying to another student -> target recipient is the original post author
       const targetRole = targetPost?.is_instructor ? "instructor" : "user";
       const targetSessionId = isInstructor
         ? targetPost?.session_id || null
@@ -65,17 +61,22 @@ export function ReplyBox({
           ? null
           : targetPost?.session_id || null;
 
-      // Only notify if Bob is not notifying himself
+      // Make notification message descriptive by including a text snippet
+      const contentSnippet =
+        replyContent.length > 40
+          ? replyContent.substring(0, 40) + "..."
+          : replyContent;
+
       if (targetSessionId !== sessionId) {
         await supabase.from("notifications").insert({
           user_session_id: targetSessionId,
           target_role: targetRole,
-          post_id: postId,
+          post_id: targetPost?.id || postId,
           actor_name: author,
           message:
             lang === "en"
-              ? `${author} replied to your thread`
-              : `${author} さんがスレッドに返信しました`,
+              ? `${author}: "${contentSnippet}"`
+              : `${author}: 「${contentSnippet}」`,
         });
       }
 
@@ -167,7 +168,8 @@ export function ThreadItem({
   return (
     <div className="space-y-3 pl-3 sm:pl-6 border-l-2 border-slate-200">
       <div
-        className={`border rounded-xl p-4 sm:p-5 shadow-sm transition-all ${
+        id={`post-${post.id}`}
+        className={`border rounded-xl p-4 sm:p-5 shadow-sm transition-all duration-300 ${
           post.is_instructor
             ? "bg-amber-50/60 border-amber-200"
             : "bg-white border-slate-200/80"

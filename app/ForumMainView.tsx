@@ -197,7 +197,8 @@ export function ForumMainView({
       ) : activePost ? (
         <div className="flex-1 overflow-y-auto p-4 sm:p-10 max-w-5xl w-full mx-auto space-y-6 sm:space-y-8">
           <article
-            className={`border rounded-2xl p-5 sm:p-7 shadow-sm transition-all ${
+            id={`post-${activePost.id}`}
+            className={`border rounded-2xl p-5 sm:p-7 shadow-sm transition-all duration-300 ${
               activePost.is_instructor
                 ? "bg-amber-50/60 border-amber-200"
                 : "bg-white border-slate-200"
