@@ -9,3 +9,14 @@ export type Post = {
   parent_id: string | null;
   replies?: Post[];
 };
+
+export type Notification = {
+  id: string;
+  user_session_id: string | null;
+  target_role: "instructor" | "user";
+  post_id: string;
+  actor_name: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};

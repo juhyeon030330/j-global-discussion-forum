@@ -329,6 +329,7 @@ export function ForumMainView({
 
             <ReplyBox
               postId={activePost.id}
+              targetPost={activePost}
               nickname={nickname}
               sessionId={sessionId}
               isInstructor={isInstructor}

@@ -7,6 +7,7 @@ import { Post } from "./types";
 
 export function ReplyBox({
   postId,
+  targetPost, // Added targetPost to know who we are notifying
   nickname,
   sessionId,
   isInstructor,
@@ -14,6 +15,7 @@ export function ReplyBox({
   onRefresh,
 }: {
   postId: string;
+  targetPost?: Post;
   nickname: string;
   sessionId: string;
   isInstructor: boolean;
@@ -39,15 +41,44 @@ export function ReplyBox({
           ? "Anonymous"
           : "匿名");
 
-    const { error } = await supabase.from("posts").insert({
-      content: replyContent,
-      author_name: author,
-      session_id: sessionId,
-      is_instructor: isInstructor,
-      parent_id: postId,
-    });
+    const { data: newReply, error } = await supabase
+      .from("posts")
+      .insert({
+        content: replyContent,
+        author_name: author,
+        session_id: sessionId,
+        is_instructor: isInstructor,
+        parent_id: postId,
+      })
+      .select()
+      .single();
 
-    if (!error) {
+    if (!error && newReply) {
+      // Determine recipient:
+      // If an instructor is replying -> target recipient is the student user
+      // If a student is replying to an instructor post -> target recipient is the instructor
+      // If a student is replying to another student -> target recipient is the original post author
+      const targetRole = targetPost?.is_instructor ? "instructor" : "user";
+      const targetSessionId = isInstructor
+        ? targetPost?.session_id || null
+        : targetPost?.is_instructor
+          ? null
+          : targetPost?.session_id || null;
+
+      // Only notify if Bob is not notifying himself
+      if (targetSessionId !== sessionId) {
+        await supabase.from("notifications").insert({
+          user_session_id: targetSessionId,
+          target_role: targetRole,
+          post_id: postId,
+          actor_name: author,
+          message:
+            lang === "en"
+              ? `${author} replied to your thread`
+              : `${author} さんがスレッドに返信しました`,
+        });
+      }
+
       setReplyContent("");
       onRefresh();
     }
@@ -234,6 +265,7 @@ export function ThreadItem({
           <div className="mt-3">
             <ReplyBox
               postId={post.id}
+              targetPost={post}
               nickname={nickname}
               sessionId={sessionId}
               isInstructor={isInstructor}

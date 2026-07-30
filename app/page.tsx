@@ -104,10 +104,17 @@ function ForumContent() {
     fetchPosts();
 
     const handleOpenModal = () => setShowModal(true);
+    const handleNavigatePost = (e: CustomEvent<string>) => {
+      if (e.detail) handleSelectPost(e.detail);
+    };
 
     window.addEventListener("open-instructor-modal", handleOpenModal);
     window.addEventListener("instructor-status-changed", checkInstructorStatus);
     window.addEventListener("lang-changed", checkLang);
+    window.addEventListener(
+      "navigate-post",
+      handleNavigatePost as EventListener,
+    );
 
     return () => {
       window.removeEventListener("open-instructor-modal", handleOpenModal);
@@ -116,10 +123,13 @@ function ForumContent() {
         checkInstructorStatus,
       );
       window.removeEventListener("lang-changed", checkLang);
+      window.removeEventListener(
+        "navigate-post",
+        handleNavigatePost as EventListener,
+      );
     };
   }, []);
 
-  // Sync selected post when URL param changes via back/forward buttons
   useEffect(() => {
     const urlPostId = searchParams.get("post");
     if (urlPostId && urlPostId !== selectedPostId) {
