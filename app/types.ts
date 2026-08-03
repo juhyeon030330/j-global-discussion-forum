@@ -8,6 +8,7 @@ export type Post = {
   created_at: string;
   parent_id: string | null;
   replies?: Post[];
+  tags?: string[];
 };
 
 export type Notification = {

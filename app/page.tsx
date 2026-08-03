@@ -15,6 +15,9 @@ function ForumContent() {
         posts={state.posts}
         selectedPostId={state.selectedPostId}
         searchTerm={state.searchTerm}
+        selectedTag={state.selectedTag}
+        sortBy={state.sortBy}
+        allTagsWithCounts={state.allTagsWithCounts}
         nickname={state.nickname}
         nicknameError={state.nicknameError}
         nicknameConfirmed={state.nicknameConfirmed}
@@ -28,6 +31,8 @@ function ForumContent() {
           state.setMobileOpen(false);
         }}
         onSearchChange={state.setSearchTerm}
+        onTagSelect={state.setSelectedTag}
+        onSortChange={state.setSortBy}
         onNicknameChange={state.handleNicknameChange}
         onClaimNickname={state.handleClaimNickname}
         onOpenNicknameManager={() => state.setShowNicknameManager(true)}
@@ -38,19 +43,23 @@ function ForumContent() {
         activePost={state.activePost}
         isCreating={state.isCreating}
         isInstructor={state.isInstructor}
+        allTags={state.allTags}
         nickname={state.nickname}
         sessionId={state.sessionId}
         lang={state.lang}
         title={state.title}
         content={state.content}
+        tags={state.tags}
         loading={state.loading}
         onOpenMobile={() => state.setMobileOpen(true)}
         onCancelCreate={() => state.setIsCreating(false)}
         onCreateSubmit={state.handleCreatePost}
         setTitle={state.setTitle}
         setContent={state.setContent}
+        setTags={state.setTags}
         onPromptDelete={state.promptDelete}
         onRefresh={state.fetchPosts}
+        onSelectTag={state.setSelectedTag}
       />
 
       <ForumModals

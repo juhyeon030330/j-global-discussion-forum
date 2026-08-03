@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { Post } from "./types";
+
+export type SortOption = "newest" | "oldest" | "replies";
 
 export function useForumState() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -15,6 +17,8 @@ export function useForumState() {
   const [isInstructor, setIsInstructor] = useState<boolean>(false);
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [lang, setLang] = useState<"en" | "jp">("en");
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -31,11 +35,35 @@ export function useForumState() {
 
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Extract all unique existing tags across all posts with frequency count
+  const allTagsWithCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    const traverse = (nodeList: Post[]) => {
+      nodeList.forEach((p) => {
+        p.tags?.forEach((t) => {
+          const lower = t.toLowerCase().trim();
+          if (lower) counts[lower] = (counts[lower] || 0) + 1;
+        });
+        if (p.replies) traverse(p.replies);
+      });
+    };
+    traverse(posts);
+    return Object.entries(counts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  }, [posts]);
+
+  const allTags = useMemo(
+    () => allTagsWithCounts.map((item) => item.tag),
+    [allTagsWithCounts],
+  );
 
   const buildThreadTree = (postsList: Post[]): Post[] => {
     const postMap = new Map<string, Post>();
@@ -274,12 +302,14 @@ export function useForumState() {
         session_id: sessionId,
         is_instructor: isInstructor,
         parent_id: null,
+        tags: tags.map((t) => t.toLowerCase().trim()),
       })
       .select();
 
     if (!error) {
       setTitle("");
       setContent("");
+      setTags([]);
       setIsCreating(false);
       await fetchPosts();
       if (data && data[0]) handleSelectPost(data[0].id);
@@ -350,7 +380,9 @@ export function useForumState() {
 
     const matchesTitle = post.title?.toLowerCase().includes(query) ?? false;
     const matchesContent = post.content.toLowerCase().includes(query);
-    if (matchesTitle || matchesContent) return true;
+    const matchesTag =
+      post.tags?.some((t) => t.toLowerCase().includes(query)) ?? false;
+    if (matchesTitle || matchesContent || matchesTag) return true;
 
     if (post.replies && post.replies.length > 0) {
       return post.replies.some((reply) => postMatchesSearch(reply, term));
@@ -358,7 +390,28 @@ export function useForumState() {
     return false;
   };
 
-  const filteredPosts = posts.filter((p) => postMatchesSearch(p, searchTerm));
+  const filteredPosts = posts
+    .filter((p) => {
+      const matchesSearch = postMatchesSearch(p, searchTerm);
+      const matchesTag = selectedTag
+        ? p.tags?.some((t) => t.toLowerCase() === selectedTag.toLowerCase())
+        : true;
+      return matchesSearch && matchesTag;
+    })
+    .sort((a, b) => {
+      if (sortBy === "oldest") {
+        return (
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      }
+      if (sortBy === "replies") {
+        return (b.replies?.length || 0) - (a.replies?.length || 0);
+      }
+      return (
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    });
+
   const activePost = posts.find((p) => p.id === selectedPostId);
 
   return {
@@ -366,6 +419,10 @@ export function useForumState() {
     activePost,
     selectedPostId,
     searchTerm,
+    selectedTag,
+    sortBy,
+    allTags,
+    allTagsWithCounts,
     nickname,
     nicknameError,
     nicknameConfirmed,
@@ -381,8 +438,11 @@ export function useForumState() {
     deleteModal,
     title,
     content,
+    tags,
     loading,
     setSearchTerm,
+    setSelectedTag,
+    setSortBy,
     setIsCreating,
     setMobileOpen,
     setShowModal,
@@ -391,6 +451,7 @@ export function useForumState() {
     setDeleteModal,
     setTitle,
     setContent,
+    setTags,
     fetchPosts,
     handleNicknameChange,
     handleClaimNickname,

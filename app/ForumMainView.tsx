@@ -14,24 +14,29 @@ import {
 import { Post } from "./types";
 import { ReplyBox, ThreadItem } from "./ThreadComponents";
 import { createClient } from "@/utils/supabase/client";
+import { TagInputComponent } from "./TagInputComponent";
 
 interface ForumMainViewProps {
   activePost: Post | undefined;
   isCreating: boolean;
   isInstructor: boolean;
+  allTags: string[];
   nickname: string;
   sessionId: string;
   lang: "en" | "jp";
   title: string;
   content: string;
+  tags: string[];
   loading: boolean;
   onOpenMobile: () => void;
   onCancelCreate: () => void;
   onCreateSubmit: (e: React.FormEvent) => void;
   setTitle: (val: string) => void;
   setContent: (val: string) => void;
+  setTags: React.Dispatch<React.SetStateAction<string[]>>;
   onPromptDelete: (id: string, isReply: boolean) => void;
   onRefresh: () => void;
+  onSelectTag: (tag: string) => void;
 }
 
 function hasInstructorReply(post: Post): boolean {
@@ -44,24 +49,29 @@ export function ForumMainView({
   activePost,
   isCreating,
   isInstructor,
+  allTags,
   nickname,
   sessionId,
   lang,
   title,
   content,
+  tags,
   loading,
   onOpenMobile,
   onCancelCreate,
   onCreateSubmit,
   setTitle,
   setContent,
+  setTags,
   onPromptDelete,
   onRefresh,
+  onSelectTag,
 }: ForumMainViewProps) {
   const [copied, setCopied] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const supabase = createClient();
@@ -77,6 +87,7 @@ export function ForumMainView({
     if (!activePost) return;
     setEditTitle(activePost.title || "");
     setEditContent(activePost.content || "");
+    setEditTags(activePost.tags || []);
     setIsEditing(true);
   };
 
@@ -88,6 +99,7 @@ export function ForumMainView({
       .update({
         title: editTitle.trim() || null,
         content: editContent,
+        tags: editTags.map((t) => t.toLowerCase().trim()),
       })
       .eq("id", activePost.id);
 
@@ -159,6 +171,15 @@ export function ForumMainView({
                 required
                 className="w-full border border-slate-200 rounded-xl px-4 py-3 text-slate-800 text-base focus:outline-none focus:border-[#1f497c]"
               />
+
+              {/* Tag Input Field */}
+              <TagInputComponent
+                tags={tags}
+                allSuggestions={allTags}
+                lang={lang}
+                onTagsChange={setTags}
+              />
+
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
@@ -226,7 +247,25 @@ export function ForumMainView({
                     </span>
                   )}
                 </div>
-                <p className="text-xs sm:text-sm text-slate-500 mt-1.5">
+
+                {/* Display Tags on Active Post */}
+                {!isEditing &&
+                  activePost.tags &&
+                  activePost.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {activePost.tags.map((tag) => (
+                        <button
+                          key={tag}
+                          onClick={() => onSelectTag(tag)}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono font-medium px-2.5 py-0.5 rounded-md flex items-center gap-1 transition-colors cursor-pointer border border-slate-200/60"
+                        >
+                          #{tag}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                <p className="text-xs sm:text-sm text-slate-500 mt-2">
                   {lang === "en" ? "Posted by " : "投稿者: "}
                   <span className="font-semibold text-slate-800">
                     {activePost.author_name}
@@ -281,13 +320,22 @@ export function ForumMainView({
             </div>
 
             {isEditing ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg p-2 text-base text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1f497c]"
                 />
+
+                {/* Edit Mode Tag Input */}
+                <TagInputComponent
+                  tags={editTags}
+                  allSuggestions={allTags}
+                  lang={lang}
+                  onTagsChange={setEditTags}
+                />
+
                 <textarea
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}

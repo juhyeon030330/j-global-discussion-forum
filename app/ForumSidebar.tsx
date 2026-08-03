@@ -11,6 +11,10 @@ import {
   AlertCircle,
   Check,
   Settings,
+  Tag,
+  XCircle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Post } from "./types";
 
@@ -18,6 +22,9 @@ interface ForumSidebarProps {
   posts: Post[];
   selectedPostId: string | null;
   searchTerm: string;
+  selectedTag: string | null;
+  sortBy: "newest" | "oldest" | "replies";
+  allTagsWithCounts: { tag: string; count: number }[];
   nickname: string;
   nicknameError: string;
   nicknameConfirmed: boolean;
@@ -28,6 +35,8 @@ interface ForumSidebarProps {
   onSelectPost: (id: string) => void;
   onStartCreating: () => void;
   onSearchChange: (val: string) => void;
+  onTagSelect: (tag: string | null) => void;
+  onSortChange: (sort: "newest" | "oldest" | "replies") => void;
   onNicknameChange: (val: string) => void;
   onClaimNickname: () => void;
   onOpenNicknameManager: () => void;
@@ -44,6 +53,9 @@ export function ForumSidebar({
   posts,
   selectedPostId,
   searchTerm,
+  selectedTag,
+  sortBy,
+  allTagsWithCounts,
   nickname,
   nicknameError,
   nicknameConfirmed,
@@ -54,12 +66,15 @@ export function ForumSidebar({
   onSelectPost,
   onStartCreating,
   onSearchChange,
+  onTagSelect,
+  onSortChange,
   onNicknameChange,
   onClaimNickname,
   onOpenNicknameManager,
   onCloseMobile,
 }: ForumSidebarProps) {
   const [filterUnanswered, setFilterUnanswered] = useState(false);
+  const [showAllTags, setShowAllTags] = useState(false);
 
   const visiblePosts = posts.filter((post) => {
     if (filterUnanswered && hasInstructorReply(post)) {
@@ -106,13 +121,16 @@ export function ForumSidebar({
             />
             <input
               type="text"
-              placeholder={lang === "en" ? "Search..." : "検索..."}
+              placeholder={
+                lang === "en" ? "Search posts or #tags..." : "検索..."
+              }
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
               className="w-full pl-8 pr-2.5 py-1.5 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[#1f497c]/20"
             />
           </div>
 
+          {/* Sort and Filter Row */}
           <div className="flex items-center justify-between gap-1.5 pt-0.5">
             <button
               type="button"
@@ -125,6 +143,24 @@ export function ForumSidebar({
             >
               {lang === "en" ? "Needs Answer" : "未回答のみ"}
             </button>
+
+            <select
+              value={sortBy}
+              onChange={(e) =>
+                onSortChange(e.target.value as "newest" | "oldest" | "replies")
+              }
+              className="text-[11px] font-semibold bg-white border border-slate-200 rounded-lg px-2 py-1 text-slate-600 focus:outline-none cursor-pointer"
+            >
+              <option value="newest">
+                {lang === "en" ? "Newest" : "最新順"}
+              </option>
+              <option value="oldest">
+                {lang === "en" ? "Oldest" : "古い順"}
+              </option>
+              <option value="replies">
+                {lang === "en" ? "Most Replies" : "返信数順"}
+              </option>
+            </select>
 
             {isInstructor && (
               <button
@@ -143,7 +179,66 @@ export function ForumSidebar({
             )}
           </div>
 
-          {/* Clean Nickname Header with Claim Button & Status */}
+          {/* Tag Selector Drawer */}
+          {allTagsWithCounts.length > 0 && (
+            <div className="space-y-1">
+              <button
+                type="button"
+                onClick={() => setShowAllTags(!showAllTags)}
+                className="w-full flex items-center justify-between text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer pt-1"
+              >
+                <span className="flex items-center gap-1">
+                  <Tag size={12} />
+                  {lang === "en" ? "Browse Tags" : "タグで絞り込み"} (
+                  {allTagsWithCounts.length})
+                </span>
+                {showAllTags ? (
+                  <ChevronUp size={12} />
+                ) : (
+                  <ChevronDown size={12} />
+                )}
+              </button>
+
+              {showAllTags && (
+                <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto p-1.5 bg-white border border-slate-200 rounded-lg shadow-inner">
+                  {allTagsWithCounts.map(({ tag, count }) => {
+                    const isSelected = selectedTag?.toLowerCase() === tag;
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => onTagSelect(isSelected ? null : tag)}
+                        className={`text-[10px] font-mono px-2 py-0.5 rounded flex items-center gap-1 transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-[#1f497c] text-white font-bold"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        #{tag}
+                        <span className="opacity-60 text-[9px]">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Active Tag Filter Indicator */}
+          {selectedTag && (
+            <div className="flex items-center justify-between bg-[#1f497c]/10 border border-[#1f497c]/20 rounded-lg px-2 py-1 text-[11px] text-[#1f497c] font-semibold">
+              <span className="flex items-center gap-1 truncate">
+                <Tag size={12} /> Filtering: #{selectedTag}
+              </span>
+              <button
+                onClick={() => onTagSelect(null)}
+                className="hover:text-red-500 cursor-pointer ml-1"
+              >
+                <XCircle size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* Clean Nickname Header */}
           <div className="pt-1 border-t border-slate-100 space-y-1">
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -233,6 +328,28 @@ export function ForumSidebar({
                 <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mb-1.5">
                   {post.content}
                 </p>
+
+                {/* Render Tag Chips */}
+                {post.tags && post.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mb-2">
+                    {post.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTagSelect(tag);
+                        }}
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-mono transition-colors ${
+                          selectedTag === tag
+                            ? "bg-[#1f497c] text-white font-bold"
+                            : "bg-slate-100 hover:bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center text-[10px] text-slate-400">
                   <span className="font-medium text-slate-600 truncate max-w-[110px]">
