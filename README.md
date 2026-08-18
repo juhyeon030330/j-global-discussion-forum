@@ -1,16 +1,25 @@
-### step 1
+# Forums Project
 
-Acquire the `.env` file.  
-Place it in the root.
+the non integrated version.  
+stable working build.
 
-### step 2
+### how to run
+
+aquire env file and run
 
 ```bash
 npm install
-```
-
-### step 3
-
-```bash
 npm run dev
 ```
+
+### what the forum can do
+
+multiple threads of discussion.  
+username claim.  
+instructors can release claimed names.  
+sort by newest, oldest, most replies.  
+en / jp toggle.  
+notification system.  
+tagging system.  
+search engine searches recursively.  
+can share, edit, and delete posts.
