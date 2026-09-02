@@ -3,6 +3,8 @@
 the non integrated version.  
 stable working build.
 
+[Website Link](https://j-global-discussion-forum.vercel.app/)
+
 ### how to run
 
 aquire env file and run
